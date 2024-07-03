@@ -1,0 +1,166 @@
+import time
+import random
+import threading
+import pandas as pd
+
+def fetch_questions():
+    # Carregar o arquivo do Excel
+    df = pd.read_excel('questions.xlsx')
+
+    # Pegar as perguntas aleatoriamente
+    questions = df.sample(n=5)  # Reduzido para cinco perguntas por filósofo
+
+    return questions.values.tolist()
+
+class Filosofo(threading.Thread):
+    def __init__(self, nome, garfo_esquerda, garfo_direita):
+        super().__init__()
+        self.nome = nome
+        self.garfo_esquerda = garfo_esquerda
+        self.garfo_direita = garfo_direita
+        self.erros = 0
+        self.erros_consecutivos = 0
+        self.pontos = 0
+
+    def run(self):
+        while True:
+            self.ask_question()
+            time.sleep(random.randint(1, 5))
+
+    def ask_question(self):
+        questions = fetch_questions()
+
+        # Quiz
+        score = 0
+        for question_data in questions:
+            question, option1, option2, option3, option4, answer = question_data
+            options = [option1, option2, option3, option4]
+            score += self.check_answer(question, options, answer)
+
+        # Mostrar pontuação final
+        print("\n===== Pontuação Final =====")
+        print(f"{self.nome}: Total de perguntas: {len(questions)}, Perguntas corretas: {score}, Perguntas incorretas: {len(questions) - score}")
+        self.pontos += score
+
+    def check_answer(self, question, options, answer):
+        print("\n" + question)
+        for i, option in enumerate(options):
+            print(f"{i+1}) {option}")
+
+        user_answer = input("Resposta (Digite o número da opção correta): ")
+        if user_answer.isdigit() and int(user_answer) == answer:
+            print("Resposta correta!")
+            self.erros_consecutivos = 0  # Resetar o contador de erros consecutivos em caso de resposta correta
+            return 1
+        else:
+            print("Resposta incorreta!")
+            self.erros += 1
+            self.erros_consecutivos += 1
+            return 0
+
+def verificar_deadlock(filosofos):
+    filosofos_em_impasse = sum(1 for filosofo in filosofos if filosofo.erros_consecutivos >= 2)
+    return filosofos_em_impasse >= 2
+
+def modo_multijogador():
+    num_filosofos = 5
+    garfos = [threading.Semaphore(1) for _ in range(num_filosofos)]
+    filosofos = [Filosofo(f"Filosofo {i+1}", garfos[i], garfos[(i + 1) % num_filosofos]) for i in range(num_filosofos)]
+
+    rodada = 1
+    continuar_jogo = True
+
+    while continuar_jogo:
+        print(f"--- Rodada {rodada} ---")
+        for filosofo in filosofos:
+            filosofo.ask_question()
+            print(f"{filosofo.nome} acertou {filosofo.pontos} perguntas.")
+
+        if verificar_deadlock(filosofos):
+            print("Alerta de Deadlock: Dois filósofos cometeram dois erros consecutivos.")
+            break
+
+        if rodada >= 3:
+            print("\nPontuação acumulada até agora:")
+            for filosofo in filosofos:
+                print(f"{filosofo.nome}: {filosofo.pontos} pontos")
+
+            print("Deseja continuar e acumular pontos? (sim ou não)")
+            continuar = input().strip().lower()
+            if continuar != 'sim':
+                continuar_jogo = False
+                print("Fim de jogo.")
+                break
+
+        rodada += 1
+    
+    if continuar_jogo:
+        print("Fim do jogo.")
+        for filosofo in filosofos:
+            print(f"{filosofo.nome} acumulou {filosofo.pontos} pontos no total.")
+
+def modo_assistido():
+    class Philosopher(threading.Thread):
+        def __init__(self, index, left_fork, right_fork):
+            threading.Thread.__init__(self)
+            self.index = index
+            self.left_fork = left_fork
+            self.right_fork = right_fork
+
+        def run(self):
+            while True:
+                print(f"Filósofo {self.index} está pensando.")
+                time.sleep(1)
+                self.dine()
+
+        def dine(self):
+            # Pegue o garfo da esquerda e depois o da direita (evita deadlock)
+            with self.left_fork:
+                print(f"Filósofo {self.index} pegou o garfo esquerdo.")
+                with self.right_fork:
+                    print(f"Filósofo {self.index} pegou o garfo direito.")
+
+                    print(f"Filósofo {self.index} está comendo.")
+                    time.sleep(1)
+                
+                print(f"Filósofo {self.index} soltou o garfo direito.")
+            print(f"Filósofo {self.index} soltou o garfo esquerdo.")
+
+    # Inicialização dos garfos (semáforos)
+    forks = [threading.Semaphore() for _ in range(5)]
+
+    # Criação e início dos filósofos
+    philosophers = [
+        Philosopher(i, forks[i], forks[(i + 1) % 5])
+        for i in range(5)
+    ]
+
+    for philosopher in philosophers:
+        philosopher.start()
+
+    # Espera para que o modo assistido termine (pressione Ctrl+C para interromper)
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nSimulação do Jantar dos Filósofos interrompida.")
+
+def main():
+    print("Bem-vindo ao Jogo dos Filósofos!")
+    print("Escolha o modo de jogo:")
+    print("1. Modo Assistido")
+    print("2. Modo Multijogador")
+    
+    escolha = input("Digite o número do modo desejado: ").strip()
+
+    if escolha == '1':
+        print("Iniciando o Modo Assistido...")
+        modo_assistido()
+    elif escolha == '2':
+        print("Iniciando o Modo Multijogador...")
+        modo_multijogador()
+    else:
+        print("Opção inválida. Saindo do jogo.")
+
+if __name__ == "__main__":
+    main()
