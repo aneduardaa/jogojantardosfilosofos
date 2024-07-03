@@ -1,0 +1,50 @@
+import threading
+import time
+
+# Número de filósofos (e garfos)
+N = 5
+
+# Lista de semáforos para representar os garfos
+garfos = [threading.Semaphore(1) for _ in range(N)]
+
+class Filosofo(threading.Thread):
+    def __init__(self, id, garfo_esquerda, garfo_direita):
+        super().__init__()
+        self.id = id
+        self.garfo_esquerda = garfo_esquerda
+        self.garfo_direita = garfo_direita
+
+    def run(self):
+        while True:
+            self.pensar()
+            self.comer()
+
+    def pensar(self):
+        print(f"Filósofo {self.id} está pensando.")
+        time.sleep(1)
+
+    def comer(self):
+        print(f"Filósofo {self.id} está com fome.")
+        self.garfo_esquerda.acquire()
+        print(f"Filósofo {self.id} pegou o garfo esquerdo.")
+        self.garfo_direita.acquire()
+        print(f"Filósofo {self.id} pegou o garfo direito.")
+        print(f"Filósofo {self.id} está comendo.")
+        time.sleep(1)  # Tempo simulado de comer
+        self.garfo_direita.release()
+        print(f"Filósofo {self.id} largou o garfo direito.")
+        self.garfo_esquerda.release()
+        print(f"Filósofo {self.id} largou o garfo esquerdo.")
+
+# Criar filósofos
+filosofos = [Filosofo(i, garfos[i], garfos[(i + 1) % N]) for i in range(N)]
+
+# Iniciar os filósofos
+for filosofo in filosofos:
+    filosofo.start()
+
+# Aguardar a execução de todos os filósofos
+for filosofo in filosofos:
+    filosofo.join()
+
+print("Fim do jantar dos filósofos.")
